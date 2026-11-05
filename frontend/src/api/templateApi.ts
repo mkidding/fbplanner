@@ -17,6 +17,7 @@ export async function generateBeadTemplate(
   formData.append("preserve_aspect_ratio", String(params.preserveAspectRatio));
   formData.append("contour_mode", params.contourMode);
   formData.append("contour_color", params.contourColor);
+  formData.append("connect_parts", String(params.connectParts));
 
   const response = await fetch(`${API_BASE}/templates/generate`, {
     method: "POST",

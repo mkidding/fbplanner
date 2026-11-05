@@ -23,8 +23,8 @@ Simulates the ironed/melted fuse bead piece after crafting, rendering each bead 
 
 ![Just Image Fused Bead View](./docs/screenshots/just-image-view.png)
 
-### 3. Retro Bot Sample & Interactive Bead Bill of Materials (BOM)
-Click any color in the right-hand **Bead Bill of Materials** to isolate and highlight its exact peg positions on the 52×52 board:
+### 3. Separated-Part Bridging (`Bot + Floating Hands` Sample) & BOM
+In `Bot + Floating Hands`, the raw image has a detached floating orb above the head and two detached floating hands. FuseBead Studio strips the cream background, wraps a unified outline, and **automatically bridges the separated islands** to the main body so the ironed piece holds together as a single physical unit:
 
 ![Retro Bot Template View](./docs/screenshots/robot-template-view.png)
 
@@ -32,11 +32,16 @@ Click any color in the right-hand **Bead Bill of Materials** to isolate and high
 
 ## Key Features
 
-- **Automatic Foreground Extraction & Auto-Crop:** Strips background scenes (via local `rembg` ONNX session or deterministic OpenCV LAB + GrabCut segmentation) and crops tightly around the foreground figure so your subject maximizes the target bead dimensions.
-- **Unified Border & Single-Color Contour:**
-  - **Silhouette Smoothing:** Fills 1-bead pinholes and prunes stray 1-bead spurs.
-  - **Boundary Fringe Denoising:** Replaces anti-aliased edge transition pixels with the nearest interior core color.
-  - **Outer Contour / Unify Edge:** Wraps a continuous 1-bead outline (`Black #000`, `Auto Darkest`, or `White #FFF`) around the figure so the template looks crisp and holds together physically when ironed.
+- **Hybrid Background Removal & Side-by-Side Extraction Preview:**
+  - Strips background scenes using a hybrid pipeline (**border-seeded CIELAB flood-fill + OpenCV GrabCut + `rembg` U2-Net ONNX** when complex scenes are detected) and auto-crops transparent margins around the subject.
+  - Displays a live **Raw Input → BG Removed** side-by-side preview in the left panel.
+- **Automatic Separated-Part Bridging (`connectivity.py`):**
+  - On a physical fuse bead pegboard, disconnected islands (floating accessories, detached hands/wings, or parts touching only diagonally) fall apart when lifted after ironing.
+  - Uses 4-connected (orthogonal) component analysis and iterative Minimum Spanning Tree (MST) shortest-path bridging to connect all separated islands and reinforce diagonal-only pinch joints into **1 unified physical piece**.
+- **Unified Border & Single-Color Contour (`contour.py`):**
+  - **Silhouette Smoothing:** Fills 1-bead pinholes and prunes stray 0-neighbor specks.
+  - **Boundary Fringe Denoising:** Replaces anti-aliased edge transition pixels with the nearest interior core color using an L1 distance transform.
+  - **Outer Contour / Unify Edge:** Wraps a continuous 1-bead outline (`Black #000`, `Auto Darkest`, or `White #FFF`) around the figure.
 - **Universal `16 / 64 / 256` Color Palettes (Default: `64`):** Perceptual CIELAB ($\Delta E$) nearest-color matching onto standard 4-bit (16), 6-bit (64), and 8-bit (256) universal palettes.
 - **52×52 Pegboard Constraint:** Target output dimensions (`W × H`, up to `52×52`) with optional aspect-ratio lock (`Fit Aspect`), automatically centered on the 52×52 board.
 - **Sub-Pixel Bead Sprite Renderer (`4×4px` or `8×8px` per Bead):**
@@ -72,7 +77,8 @@ fbplanner/
 │   │       ├── downsampler.py      # Alpha-premultiplied bilateral downsampler
 │   │       ├── palettes.py         # Universal 16 / 64 / 256 palettes + CIELAB cache
 │   │       ├── quantizer.py        # Perceptual CIELAB color matching & BOM counter
-│   │       └── contour.py          # Silhouette smoothing, fringe denoising & unified outline
+│   │       ├── contour.py          # Silhouette smoothing, fringe denoising & unified outline
+│   │       └── connectivity.py     # 4-connected component analysis & separated-part bridging
 │   └── tests/
 │       └── test_api.py             # Pytest suite for palettes, contour modes & API
 │

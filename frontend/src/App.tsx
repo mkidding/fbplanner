@@ -29,6 +29,7 @@ export const App: React.FC = () => {
   const [preserveAspectRatio, setPreserveAspectRatio] = useState<boolean>(true);
   const [contourMode, setContourMode] = useState<ContourMode>("outer-contour");
   const [contourColor, setContourColor] = useState<ContourColorPreset>("black");
+  const [connectParts, setConnectParts] = useState<boolean>(true);
 
   // Display view parameters
   const [viewMode, setViewMode] = useState<DisplayViewMode>("on-board");
@@ -85,6 +86,7 @@ export const App: React.FC = () => {
           preserveAspectRatio,
           contourMode,
           contourColor,
+          connectParts,
         });
         setTemplate(result);
       } catch (err) {
@@ -104,6 +106,7 @@ export const App: React.FC = () => {
     preserveAspectRatio,
     contourMode,
     contourColor,
+    connectParts,
   ]);
 
   return (
@@ -123,7 +126,7 @@ export const App: React.FC = () => {
                 </span>
               </h1>
               <p className="text-xs text-slate-400">
-                Foreground Extraction • Unified Contour Outline • Universal 16/64/256 Palette
+                Background Removal • Separated-Part Bridging • Unified Contour • 16/64/256 Palette
               </p>
             </div>
           </div>
@@ -143,6 +146,8 @@ export const App: React.FC = () => {
           <ImageUploader
             selectedFile={selectedFile}
             previewUrl={previewUrl}
+            extractedPreviewUrl={template?.extracted_preview_data_url}
+            extractForeground={extractForeground}
             onSelectFile={handleSelectFile}
           />
 
@@ -174,7 +179,10 @@ export const App: React.FC = () => {
 
           <ForegroundToggle
             extractForeground={extractForeground}
-            onChange={setExtractForeground}
+            onChangeExtractForeground={setExtractForeground}
+            connectParts={connectParts}
+            onChangeConnectParts={setConnectParts}
+            connectivity={template?.connectivity}
           />
 
           {error && (

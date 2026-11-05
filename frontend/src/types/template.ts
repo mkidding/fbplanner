@@ -26,6 +26,13 @@ export interface PaletteColorUsage {
   count: number;
 }
 
+export interface ConnectivityMetadata {
+  connect_parts_enabled: boolean;
+  initial_components: number;
+  final_components: number;
+  bridge_beads_added: number;
+}
+
 export interface TemplateGenerateResponse {
   board_size: Dimensions;
   requested_size: Dimensions;
@@ -36,6 +43,8 @@ export interface TemplateGenerateResponse {
   preserve_aspect_ratio: boolean;
   contour_mode: ContourMode;
   contour_color: ContourColorPreset;
+  connectivity: ConnectivityMetadata;
+  extracted_preview_data_url?: string | null;
   total_beads: number;
   unique_colors_used: number;
   palette_usage: PaletteColorUsage[];
@@ -51,4 +60,5 @@ export interface TemplateConfigParams {
   preserveAspectRatio: boolean;
   contourMode: ContourMode;
   contourColor: ContourColorPreset;
+  connectParts: boolean;
 }

@@ -12,7 +12,7 @@ ContourMode = Literal["outer-contour", "unify-edge", "none"]
 ContourColorPreset = Literal["black", "white", "auto-dark"]
 
 
-def _resolve_contour_palette_id(
+def resolve_contour_palette_id(
     palette_size: PaletteSize,
     color_preset: ContourColorPreset,
     grid: list[list[Optional[int]]],
@@ -81,7 +81,7 @@ def _smooth_binary_silhouette(grid: list[list[Optional[int]]]) -> list[list[Opti
                     nr, nc = r + dr, c + dc
                     if 0 <= nr < h and 0 <= nc < w and out[nr][nc] is not None:
                         ortho_count += 1
-                if ortho_count <= 1:
+                if ortho_count == 0:
                     cleaned[r][c] = None
 
     return cleaned
@@ -161,7 +161,7 @@ def apply_unified_border(
 
     smoothed = _smooth_binary_silhouette(grid)
     denoised = _unify_boundary_fringe_with_core(smoothed, fringe_thickness=2)
-    contour_pid = _resolve_contour_palette_id(palette_size, contour_color, denoised)
+    contour_pid = resolve_contour_palette_id(palette_size, contour_color, denoised)
 
     h = len(denoised)
     w = len(denoised[0])

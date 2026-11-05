@@ -49,6 +49,7 @@ async def create_template(
     preserve_aspect_ratio: bool = Form(True),
     contour_mode: str = Form("outer-contour"),
     contour_color: str = Form("black"),
+    connect_parts: bool = Form(True),
 ) -> TemplateGenerateResponse:
     """Convert an uploaded image into a fuse bead template grid."""
     if palette_size not in ALLOWED_PALETTE_SIZES:
@@ -86,6 +87,7 @@ async def create_template(
             preserve_aspect_ratio=preserve_aspect_ratio,
             contour_mode=cast(ContourMode, contour_mode),
             contour_color=cast(ContourColorPreset, contour_color),
+            connect_parts=connect_parts,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

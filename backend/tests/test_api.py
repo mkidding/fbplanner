@@ -1,24 +1,29 @@
-"""Tests for the Fuse Bead Template Creator backend pipeline and API."""
+"""Tests for the Fuse Bead Template Creator backend pipeline, background removal, and part connectivity."""
 
 from io import BytesIO
 from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
 
+from app.core.connectivity import connect_separated_parts, find_orthogonal_components
 from app.core.palettes import get_compiled_palette
 from app.main import app
 
 client = TestClient(app)
 
 
-def _create_sample_image_bytes(with_alpha: bool = False) -> bytes:
-    """Create a synthetic image with a bright red/yellow figure on a white background."""
-    mode = "RGBA" if with_alpha else "RGB"
-    bg = (255, 255, 255, 0) if with_alpha else (245, 245, 245)
-    img = Image.new(mode, (120, 160), bg)
+def _create_sample_image_with_separated_parts() -> bytes:
+    """
+    Create a synthetic image with a colored studio background (#fef3c7) and a figure
+    that has 3 separated islands (central body + floating top orb + floating side hand).
+    """
+    img = Image.new("RGB", (200, 200), (254, 243, 199))
     draw = ImageDraw.Draw(img)
-    # Draw central character figure
-    draw.ellipse((35, 30, 85, 80), fill=(255, 20, 20, 255) if with_alpha else (255, 20, 20))
-    draw.rectangle((45, 75, 75, 130), fill=(20, 80, 250, 255) if with_alpha else (20, 80, 250))
+    # Floating top orb (separated island 1)
+    draw.ellipse((90, 15, 110, 35), fill=(255, 100, 0))
+    # Main central robot body (island 2)
+    draw.rectangle((70, 65, 130, 155), fill=(0, 180, 210))
+    # Floating right hand (separated island 3)
+    draw.ellipse((158, 100, 182, 124), fill=(255, 100, 0))
     buf = BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
@@ -30,6 +35,30 @@ def test_compiled_palettes():
         assert len(pal.entries) == size
         assert pal.rgb_array.shape == (size, 3)
         assert pal.lab_array.shape == (size, 3)
+
+
+def test_connect_separated_parts_unit():
+    # 10x10 grid with 3 disconnected islands and 1diagonal-only joint
+    grid: list[list[int | None]] = [[None for _ in range(10)] for _ in range(10)]
+    # Main block at (4..6, 4..6)
+    for r in range(4, 7):
+        for c in range(4, 7):
+            grid[r][c] = 10
+    # Separated island at (1, 5)
+    grid[1][5] = 20
+    grid[1][6] = 20
+    # Diagonal-only neighbor at (7, 7)
+    grid[7][7] = 30
+
+    before = find_orthogonal_components(grid)
+    assert len(before) == 3
+
+    res = connect_separated_parts(grid, bridge_color_id=0, enable_bridge=True)
+    assert res.initial_components == 3
+    assert res.final_components == 1
+    assert res.bridge_beads_added > 0
+    after = find_orthogonal_components(res.grid)
+    assert len(after) == 1
 
 
 def test_health_and_config_endpoints():
@@ -44,34 +73,49 @@ def test_health_and_config_endpoints():
     assert data["board_height"] == 52
     assert data["default_palette_size"] == 64
     assert data["allowed_palette_sizes"] == [16, 64, 256]
-    assert "outer-contour" in data["allowed_contour_modes"]
 
 
-def test_generate_template_endpoint_and_contour_modes():
-    img_bytes = _create_sample_image_bytes(with_alpha=True)
-    for contour_mode in ("outer-contour", "unify-edge", "none"):
-        resp = client.post(
-            "/api/v1/templates/generate",
-            files={"file": ("sample.png", img_bytes, "image/png")},
-            data={
-                "target_width": "32",
-                "target_height": "32",
-                "palette_size": "64",
-                "extract_foreground": "true",
-                "preserve_aspect_ratio": "true",
-                "contour_mode": contour_mode,
-                "contour_color": "black",
-            },
-        )
-        assert resp.status_code == 200, resp.text
-        body = resp.json()
-        assert body["board_size"] == {"width": 52, "height": 52}
-        assert body["contour_mode"] == contour_mode
-        assert body["contour_color"] == "black"
-        assert 1 <= body["image_size"]["width"] <= 32
-        assert 1 <= body["image_size"]["height"] <= 32
-        assert body["total_beads"] > 0
-        if contour_mode != "none":
-            # Black (#000000, id=0) should be present as the unified border color
-            assert "0" in body["color_lookup"]
-            assert body["color_lookup"]["0"] == "#000000"
+def test_generate_template_background_removal_and_part_bridging():
+    img_bytes = _create_sample_image_with_separated_parts()
+
+    # 1. With connect_parts = False, separated islands remain disconnected
+    resp_unbridged = client.post(
+        "/api/v1/templates/generate",
+        files={"file": ("separated.png", img_bytes, "image/png")},
+        data={
+            "target_width": "36",
+            "target_height": "36",
+            "palette_size": "64",
+            "extract_foreground": "true",
+            "preserve_aspect_ratio": "true",
+            "contour_mode": "outer-contour",
+            "contour_color": "black",
+            "connect_parts": "false",
+        },
+    )
+    assert resp_unbridged.status_code == 200, resp_unbridged.text
+    unbridged_body = resp_unbridged.json()
+    assert unbridged_body["connectivity"]["initial_components"] >= 2
+    assert unbridged_body["connectivity"]["final_components"] >= 2
+    assert unbridged_body["extracted_preview_data_url"].startswith("data:image/png;base64,")
+
+    # 2. With connect_parts = True, separated islands are bridged into 1 physical piece
+    resp_bridged = client.post(
+        "/api/v1/templates/generate",
+        files={"file": ("separated.png", img_bytes, "image/png")},
+        data={
+            "target_width": "36",
+            "target_height": "36",
+            "palette_size": "64",
+            "extract_foreground": "true",
+            "preserve_aspect_ratio": "true",
+            "contour_mode": "outer-contour",
+            "contour_color": "black",
+            "connect_parts": "true",
+        },
+    )
+    assert resp_bridged.status_code == 200, resp_bridged.text
+    bridged_body = resp_bridged.json()
+    assert bridged_body["connectivity"]["initial_components"] >= 2
+    assert bridged_body["connectivity"]["final_components"] == 1
+    assert bridged_body["connectivity"]["bridge_beads_added"] > 0

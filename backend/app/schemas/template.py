@@ -22,6 +22,13 @@ class PaletteColorUsage(BaseModel):
     count: int = Field(..., ge=1, description="Number of beads of this color used")
 
 
+class ConnectivityMetadata(BaseModel):
+    connect_parts_enabled: bool = Field(..., description="Whether automatic part bridging was enabled")
+    initial_components: int = Field(..., description="Number of 4-connected parts before bridging")
+    final_components: int = Field(..., description="Number of 4-connected parts after bridging (1 = unified piece)")
+    bridge_beads_added: int = Field(..., description="Number of structural bridge beads added")
+
+
 class TemplateGenerateResponse(BaseModel):
     board_size: Dimensions
     requested_size: Dimensions
@@ -32,6 +39,8 @@ class TemplateGenerateResponse(BaseModel):
     preserve_aspect_ratio: bool
     contour_mode: str = "outer-contour"
     contour_color: str = "black"
+    connectivity: ConnectivityMetadata
+    extracted_preview_data_url: Optional[str] = None
     total_beads: int
     unique_colors_used: int
     palette_usage: list[PaletteColorUsage]

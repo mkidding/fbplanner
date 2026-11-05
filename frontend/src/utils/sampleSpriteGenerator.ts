@@ -1,6 +1,6 @@
 /**
- * Built-in sample images with distinct backgrounds so users can test
- * foreground extraction, 16/64/256 color quantization, and 52x52 board layout immediately.
+ * Built-in sample images with distinct backgrounds and separated/floating parts
+ * so users can test background removal, separated-part bridging, and 16/64/256 quantization.
  */
 
 export interface SamplePreset {
@@ -22,8 +22,8 @@ export const SAMPLE_PRESETS: SamplePreset[] = [
   },
   {
     id: "robot",
-    label: "Retro Bot",
-    description: "Teal & orange robot mascot on a cream background",
+    label: "Bot + Floating Hands",
+    description: "Robot with detached floating hands & antenna orb to test part bridging",
   },
 ];
 
@@ -114,47 +114,47 @@ export async function createSampleImageFile(presetId: string): Promise<File> {
     ctx.fillStyle = "#fef3c7";
     ctx.fillRect(0, 0, 240, 240);
 
-    // Antenna
-    ctx.strokeStyle = "#334155";
-    ctx.lineWidth = 8;
-    ctx.beginPath();
-    ctx.moveTo(120, 32);
-    ctx.lineTo(120, 62);
-    ctx.stroke();
-
+    // Floating energy orb above head (detached island #1)
     ctx.fillStyle = "#f97316";
     ctx.beginPath();
-    ctx.arc(120, 28, 12, 0, Math.PI * 2);
+    ctx.arc(120, 30, 14, 0, Math.PI * 2);
     ctx.fill();
 
     // Robot Head
     ctx.fillStyle = "#06b6d4";
     ctx.beginPath();
-    ctx.roundRect(62, 58, 116, 86, 18);
+    ctx.roundRect(66, 62, 108, 80, 16);
     ctx.fill();
 
     // Visor
     ctx.fillStyle = "#0f172a";
     ctx.beginPath();
-    ctx.roundRect(78, 76, 84, 36, 10);
+    ctx.roundRect(80, 78, 80, 34, 10);
     ctx.fill();
 
     // Glowing eyes
     ctx.fillStyle = "#fde047";
     ctx.beginPath();
-    ctx.arc(100, 94, 9, 0, Math.PI * 2);
-    ctx.arc(140, 94, 9, 0, Math.PI * 2);
+    ctx.arc(102, 95, 8, 0, Math.PI * 2);
+    ctx.arc(138, 95, 8, 0, Math.PI * 2);
     ctx.fill();
 
     // Torso
     ctx.fillStyle = "#0891b2";
     ctx.beginPath();
-    ctx.roundRect(74, 148, 92, 58, 12);
+    ctx.roundRect(76, 148, 88, 56, 12);
     ctx.fill();
 
     // Chest badge
     ctx.fillStyle = "#ef4444";
-    ctx.fillRect(104, 164, 32, 24);
+    ctx.fillRect(106, 164, 28, 22);
+
+    // Floating Left & Right Hands (detached islands #2 and #3)
+    ctx.fillStyle = "#f97316";
+    ctx.beginPath();
+    ctx.arc(42, 168, 15, 0, Math.PI * 2);
+    ctx.arc(198, 168, 15, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   const blob: Blob = await new Promise((resolve, reject) => {

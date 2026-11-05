@@ -1,16 +1,20 @@
 import React, { useRef } from "react";
-import { Sparkles, Upload } from "lucide-react";
+import { ArrowRight, Sparkles, Upload } from "lucide-react";
 import { SAMPLE_PRESETS, createSampleImageFile } from "../../utils/sampleSpriteGenerator";
 
 interface ImageUploaderProps {
   selectedFile: File | null;
   previewUrl: string | null;
+  extractedPreviewUrl?: string | null;
+  extractForeground: boolean;
   onSelectFile: (file: File) => void;
 }
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   selectedFile,
   previewUrl,
+  extractedPreviewUrl,
+  extractForeground,
   onSelectFile,
 }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -39,10 +43,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-          1. Raw Image Input
+          1. Raw Image & Extraction
         </label>
         {selectedFile && (
-          <span className="text-[11px] text-slate-400 truncate max-w-[150px]">
+          <span className="text-[11px] text-slate-400 truncate max-w-[140px]">
             {selectedFile.name}
           </span>
         )}
@@ -52,7 +56,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
-        className="group relative border-2 border-dashed border-slate-700 hover:border-indigo-500/70 rounded-xl p-3.5 transition-all bg-slate-950/60 hover:bg-slate-900/80 cursor-pointer flex flex-col items-center justify-center min-h-[136px]"
+        className="group relative border-2 border-dashed border-slate-700 hover:border-indigo-500/70 rounded-xl p-3 transition-all bg-slate-950/60 hover:bg-slate-900/80 cursor-pointer flex flex-col items-center justify-center min-h-[128px]"
       >
         <input
           ref={inputRef}
@@ -63,20 +67,38 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         />
 
         {previewUrl ? (
-          <div className="flex items-center gap-3.5 w-full">
-            <img
-              src={previewUrl}
-              alt="Raw upload preview"
-              className="w-20 h-20 object-contain rounded-lg bg-slate-900 border border-slate-800 p-1 shrink-0"
-            />
-            <div className="flex flex-col text-left space-y-1 overflow-hidden">
-              <span className="text-xs font-medium text-slate-200 truncate">
-                {selectedFile?.name}
-              </span>
-              <span className="text-[11px] text-slate-400">
-                Click or drop another image to replace
-              </span>
+          <div className="w-full space-y-2">
+            <div className="flex items-center justify-center gap-2.5 w-full">
+              {/* Raw Input Thumbnail */}
+              <div className="flex flex-col items-center gap-1">
+                <img
+                  src={previewUrl}
+                  alt="Raw upload preview"
+                  className="w-16 h-16 object-contain rounded-lg bg-slate-900 border border-slate-800 p-1"
+                />
+                <span className="text-[10px] text-slate-400">Raw Input</span>
+              </div>
+
+              {extractedPreviewUrl && (
+                <>
+                  <ArrowRight className="w-4 h-4 text-indigo-400 shrink-0" />
+                  {/* Extracted Foreground Thumbnail on Checkerboard */}
+                  <div className="flex flex-col items-center gap-1">
+                    <img
+                      src={extractedPreviewUrl}
+                      alt="Extracted foreground preview"
+                      className="w-16 h-16 object-contain rounded-lg bg-[radial-gradient(#475569_1px,transparent_1px)] [background-size:8px_8px] bg-slate-900 border border-indigo-500/40 p-1"
+                    />
+                    <span className="text-[10px] text-indigo-300 font-medium">
+                      {extractForeground ? "BG Removed" : "Full Frame"}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
+            <p className="text-[10px] text-center text-slate-500">
+              Click or drop another image to replace
+            </p>
           </div>
         ) : (
           <div className="flex flex-col items-center text-center space-y-1.5">
@@ -95,7 +117,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       <div className="space-y-1.5">
         <div className="flex items-center gap-1 text-[11px] text-slate-400">
           <Sparkles className="w-3 h-3 text-indigo-400" />
-          <span>Or test with a sample figure + background:</span>
+          <span>Sample figures (with background & floating parts):</span>
         </div>
         <div className="grid grid-cols-3 gap-1.5">
           {SAMPLE_PRESETS.map((preset) => (
