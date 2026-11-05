@@ -1,0 +1,9 @@
+[project]
+name = "fbtranslator-backend"
+version = "1.0.0"
+description = "Fuse Bead Template Creator FastAPI Backend"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
