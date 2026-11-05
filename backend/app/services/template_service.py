@@ -3,7 +3,7 @@
 from io import BytesIO
 from PIL import Image, ImageOps
 
-from app.config import BOARD_HEIGHT, BOARD_WIDTH, PaletteSize
+from app.config import BOARD_HEIGHT, BOARD_WIDTH, MAX_IMAGE_PIXELS, PaletteSize
 from app.core.contour import ContourColorPreset, ContourMode, apply_unified_border
 from app.core.downsampler import downsample_to_bead_grid
 from app.core.quantizer import quantize_rgba_grid, summarize_grid_usage
@@ -14,6 +14,8 @@ from app.schemas.template import (
     PaletteColorUsage,
     TemplateGenerateResponse,
 )
+
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 
 def generate_fuse_bead_template(
@@ -36,6 +38,8 @@ def generate_fuse_bead_template(
     6. Center the resulting WxH bead pattern on the 52x52 pegboard.
     """
     raw_img = Image.open(BytesIO(image_bytes))
+    if raw_img.width * raw_img.height > MAX_IMAGE_PIXELS:
+        raise ValueError("Image dimensions exceed maximum allowed pixel count.")
     raw_img = ImageOps.exif_transpose(raw_img)
 
     # Stage 1: Foreground extraction & tight subject bounding-box crop

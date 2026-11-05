@@ -1,5 +1,6 @@
 # FuseBead Studio (`fbplanner`)
 
+[![CI](https://github.com/mkidding/fbplanner/actions/workflows/ci.yml/badge.svg)](https://github.com/mkidding/fbplanner/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-indigo.svg)](./LICENSE)
 [![Backend: FastAPI](https://img.shields.io/badge/Backend-FastAPI_%2B_Python_3.11+-009688.svg)](./backend)
 [![Frontend: React + TypeScript + Vite](https://img.shields.io/badge/Frontend-React_%2B_TS_%2B_Tailwind-61dafb.svg)](./frontend)
@@ -93,9 +94,19 @@ fbplanner/
 
 ---
 
-## Getting Started (Local Development)
+## Getting Started
 
-### Prerequisites
+### Option A: One-Command Docker Compose
+```bash
+docker compose up --build
+```
+Then open **http://localhost:8080** in your browser.
+
+---
+
+### Option B: Local Development (Python + Node)
+
+#### Prerequisites
 - **Python 3.11+** (with `pip` or [`uv`](https://docs.astral.sh/uv/))
 - **Node.js 18+** and `npm`
 

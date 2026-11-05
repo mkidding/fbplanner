@@ -10,6 +10,7 @@ from app.config import (
     DEFAULT_PALETTE_SIZE,
     DEFAULT_TARGET_HEIGHT,
     DEFAULT_TARGET_WIDTH,
+    MAX_UPLOAD_BYTES,
     PaletteSize,
 )
 from app.core.contour import ContourColorPreset, ContourMode
@@ -34,6 +35,7 @@ def get_template_config() -> dict[str, object]:
         "default_palette_size": DEFAULT_PALETTE_SIZE,
         "allowed_contour_modes": list(ALLOWED_CONTOUR_MODES),
         "allowed_contour_colors": list(ALLOWED_CONTOUR_COLORS),
+        "max_upload_bytes": MAX_UPLOAD_BYTES,
     }
 
 
@@ -65,9 +67,14 @@ async def create_template(
             detail=f"Invalid contour_color={contour_color}. Allowed values: {list(ALLOWED_CONTOUR_COLORS)}",
         )
 
-    image_bytes = await file.read()
+    image_bytes = await file.read(MAX_UPLOAD_BYTES + 1)
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
+    if len(image_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Uploaded file exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB size limit.",
+        )
 
     try:
         return generate_fuse_bead_template(
@@ -80,6 +87,8 @@ async def create_template(
             contour_mode=cast(ContourMode, contour_mode),
             contour_color=cast(ContourColorPreset, contour_color),
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=400,
