@@ -1,5 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Columns, Eye, Layers, SlidersHorizontal, X } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Columns,
+  Eye,
+  GripVertical,
+  Layers,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { InspectModalTab, TemplateGenerateResponse } from "../../types/template";
 import { renderJustImageToCanvas } from "./renderers/renderJustImage";
 
@@ -22,6 +29,7 @@ export const ImageCompareModal: React.FC<ImageCompareModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<InspectModalTab>(initialTab);
   const [splitPercent, setSplitPercent] = useState<number>(50);
+  const [ isDraggingCurtain, setIsDraggingCurtain ] = useState<boolean>(false);
   const [blendOpacity, setBlendOpacity] = useState<number>(45);
   const [compareMode, setCompareMode] = useState<"curtain" | "opacity">("curtain");
   const [compareRefSource, setCompareRefSource] = useState<"bg-removed" | "raw">(
@@ -30,6 +38,7 @@ export const ImageCompareModal: React.FC<ImageCompareModalProps> = ({
 
   const sideBySideCanvasRef = useRef<HTMLCanvasElement>(null);
   const splitCanvasRef = useRef<HTMLCanvasElement>(null);
+  const splitStageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -52,6 +61,16 @@ export const ImageCompareModal: React.FC<ImageCompareModalProps> = ({
       }
     }
   }, [isOpen, activeTab, template]);
+
+  const updateSplitFromClientX = useCallback((clientX: number) => {
+    const stage = splitStageRef.current;
+    if (!stage) return;
+    const rect = stage.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const rawPct = ((clientX - rect.left) / rect.width) * 100;
+    const clamped = Math.max(0, Math.min(100, Math.round(rawPct)));
+    setSplitPercent(clamped);
+  }, []);
 
   // Close on Escape key
   useEffect(() => {
@@ -297,13 +316,34 @@ export const ImageCompareModal: React.FC<ImageCompareModalProps> = ({
                 </div>
               </div>
 
-              {/* Interactive Comparison Stage */}
+              {/* Interactive Comparison Stage (Draggable Left-Right in Curtain Mode) */}
               <div
                 className="relative bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:12px_12px] bg-slate-950 border border-slate-700 rounded-2xl p-6 flex items-center justify-center select-none"
                 style={{ minHeight: "380px" }}
               >
                 <div
-                  className="relative inline-block"
+                  ref={splitStageRef}
+                  onPointerDown={(e) => {
+                    if (compareMode !== "curtain") return;
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    setIsDraggingCurtain(true);
+                    updateSplitFromClientX(e.clientX);
+                  }}
+                  onPointerMove={(e) => {
+                    if (compareMode !== "curtain" || !isDraggingCurtain) return;
+                    updateSplitFromClientX(e.clientX);
+                  }}
+                  onPointerUp={(e) => {
+                    if (!isDraggingCurtain) return;
+                    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                      e.currentTarget.releasePointerCapture(e.pointerId);
+                    }
+                    setIsDraggingCurtain(false);
+                  }}
+                  onPointerCancel={() => setIsDraggingCurtain(false)}
+                  className={`relative inline-block touch-none ${
+                    compareMode === "curtain" ? "cursor-ew-resize" : ""
+                  }`}
                   style={{
                     width: `${template.image_size.width * 10}px`,
                     height: `${template.image_size.height * 10}px`,
@@ -317,7 +357,7 @@ export const ImageCompareModal: React.FC<ImageCompareModalProps> = ({
                       height: "100%",
                       imageRendering: "pixelated",
                     }}
-                    className="block"
+                    className="block pointer-events-none"
                   />
 
                   {/* Top Layer: Reference Image (aligned with inner subject box when outer-contour is active) */}
@@ -333,6 +373,7 @@ export const ImageCompareModal: React.FC<ImageCompareModalProps> = ({
                       <img
                         src={activeReferenceUrl}
                         alt="Reference overlay"
+                        draggable={false}
                         style={{
                           position: "absolute",
                           left: `${padPctX}%`,
@@ -340,19 +381,25 @@ export const ImageCompareModal: React.FC<ImageCompareModalProps> = ({
                           width: `${100 - padPctX * 2}%`,
                           height: `${100 - padPctY * 2}%`,
                         }}
-                        className="object-fill"
+                        className="object-fill select-none"
                       />
                     </div>
                   )}
 
-                  {/* Vertical Split Curtain Divider Line */}
+                  {/* Draggable Vertical Split Curtain Divider Line + Center Handle */}
                   {compareMode === "curtain" && (
                     <div
-                      className="absolute top-0 bottom-0 w-0.5 bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.9)] pointer-events-none"
+                      className="absolute top-0 bottom-0 w-0.5 bg-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.95)] pointer-events-none"
                       style={{ left: `${splitPercent}%` }}
                     >
-                      <div className="absolute -top-3 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow">
+                      {/* Top percentage badge */}
+                      <div className="absolute -top-3.5 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow">
                         {splitPercent}%
+                      </div>
+
+                      {/* Center Grab Handle Pill */}
+                      <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-indigo-600 border-2 border-white shadow-lg flex items-center justify-center text-white">
+                        <GripVertical className="w-4 h-4" />
                       </div>
                     </div>
                   )}
@@ -365,7 +412,9 @@ export const ImageCompareModal: React.FC<ImageCompareModalProps> = ({
                   <>
                     <div className="flex justify-between text-xs text-slate-300">
                       <span>← Reference ({compareRefSource === "bg-removed" ? "BG Removed" : "Raw"})</span>
-                      <span className="font-mono text-indigo-400">{splitPercent}%</span>
+                      <span className="font-mono text-indigo-400">
+                        Drag divider or slider ({splitPercent}%)
+                      </span>
                       <span>Fuse Bead Output →</span>
                     </div>
                     <input

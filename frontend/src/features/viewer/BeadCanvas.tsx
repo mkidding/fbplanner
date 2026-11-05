@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { GripVertical } from "lucide-react";
 import {
   CellPixelScale,
   DisplayViewMode,
@@ -16,7 +17,10 @@ interface BeadCanvasProps {
   displayZoom: number;
   highlightedColorId: number | null;
   overlayMode: OverlaySourceMode;
+  overlayStyle: "split" | "opacity";
   overlayOpacity: number;
+  overlaySplitPercent: number;
+  onChangeOverlaySplitPercent: (pct: number) => void;
   rawPreviewUrl: string | null;
   extractedPreviewUrl: string | null;
   canvasRef?: React.RefObject<HTMLCanvasElement>;
@@ -35,14 +39,19 @@ export const BeadCanvas: React.FC<BeadCanvasProps> = ({
   displayZoom,
   highlightedColorId,
   overlayMode,
+  overlayStyle,
   overlayOpacity,
+  overlaySplitPercent,
+  onChangeOverlaySplitPercent,
   rawPreviewUrl,
   extractedPreviewUrl,
   canvasRef: externalRef,
 }) => {
   const internalRef = useRef<HTMLCanvasElement>(null);
   const activeCanvasRef = externalRef ?? internalRef;
+  const containerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+  const [isDraggingSplit, setIsDraggingSplit] = useState<boolean>(false);
 
   const usageById = React.useMemo(() => {
     const map = new Map<number, PaletteColorUsage>();
@@ -89,12 +98,30 @@ export const BeadCanvas: React.FC<BeadCanvasProps> = ({
   const overlayBeadCols = Math.max(1, template.image_size.width - marginBeads * 2);
   const overlayBeadRows = Math.max(1, template.image_size.height - marginBeads * 2);
 
+  const overlayLeftPx = overlayStartCol * cellScale * displayZoom;
+  const overlayTopPx = overlayStartRow * cellScale * displayZoom;
+  const overlayWidthPx = overlayBeadCols * cellScale * displayZoom;
+  const overlayHeightPx = overlayBeadRows * cellScale * displayZoom;
+
   const overlayUrl =
     overlayMode === "bg-removed"
       ? extractedPreviewUrl
       : overlayMode === "raw"
       ? rawPreviewUrl
       : null;
+
+  const updateSplitFromClientX = useCallback(
+    (clientX: number) => {
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const relX = clientX - rect.left;
+      const pct = Math.max(0, Math.min(100, Math.round((relX / rect.width) * 100)));
+      onChangeOverlaySplitPercent(pct);
+    },
+    [onChangeOverlaySplitPercent]
+  );
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = activeCanvasRef.current;
@@ -136,6 +163,19 @@ export const BeadCanvas: React.FC<BeadCanvasProps> = ({
     });
   };
 
+  // Compute clip right percentage inside the overlay image box when in split mode
+  const splitLinePx = (overlaySplitPercent / 100) * renderedWidth;
+  const overlayVisibleWidthPx = Math.max(
+    0,
+    Math.min(overlayWidthPx, splitLinePx - overlayLeftPx)
+  );
+  const overlayClipRightPct =
+    overlayWidthPx > 0
+      ? Math.max(0, Math.min(100, 100 - (overlayVisibleWidthPx / overlayWidthPx) * 100))
+      : 0;
+
+  const isSplitOverlayActive = overlayUrl && overlayMode !== "none" && overlayStyle === "split";
+
   return (
     <div className="relative flex flex-col items-center justify-center">
       <div
@@ -146,7 +186,28 @@ export const BeadCanvas: React.FC<BeadCanvasProps> = ({
         }`}
       >
         <div
-          className="relative"
+          ref={containerRef}
+          onPointerDown={(e) => {
+            if (!isSplitOverlayActive) return;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setIsDraggingSplit(true);
+            updateSplitFromClientX(e.clientX);
+          }}
+          onPointerMove={(e) => {
+            if (!isSplitOverlayActive || !isDraggingSplit) return;
+            updateSplitFromClientX(e.clientX);
+          }}
+          onPointerUp={(e) => {
+            if (!isDraggingSplit) return;
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            }
+            setIsDraggingSplit(false);
+          }}
+          onPointerCancel={() => setIsDraggingSplit(false)}
+          className={`relative select-none touch-none ${
+            isSplitOverlayActive ? "cursor-ew-resize" : ""
+          }`}
           style={{
             width: `${renderedWidth}px`,
             height: `${renderedHeight}px`,
@@ -161,7 +222,9 @@ export const BeadCanvas: React.FC<BeadCanvasProps> = ({
               height: `${renderedHeight}px`,
               imageRendering: "pixelated",
             }}
-            className="block cursor-crosshair rounded-sm"
+            className={`block rounded-sm ${
+              isSplitOverlayActive ? "cursor-ew-resize" : "cursor-crosshair"
+            }`}
           />
 
           {/* Live Reference Image Overlay aligned peg-for-peg with the generated figure */}
@@ -169,16 +232,36 @@ export const BeadCanvas: React.FC<BeadCanvasProps> = ({
             <img
               src={overlayUrl}
               alt="Reference overlay"
+              draggable={false}
               style={{
                 position: "absolute",
-                left: `${overlayStartCol * cellScale * displayZoom}px`,
-                top: `${overlayStartRow * cellScale * displayZoom}px`,
-                width: `${overlayBeadCols * cellScale * displayZoom}px`,
-                height: `${overlayBeadRows * cellScale * displayZoom}px`,
-                opacity: overlayOpacity / 100,
+                left: `${overlayLeftPx}px`,
+                top: `${overlayTopPx}px`,
+                width: `${overlayWidthPx}px`,
+                height: `${overlayHeightPx}px`,
+                opacity: overlayStyle === "opacity" ? overlayOpacity / 100 : 0.92,
+                clipPath:
+                  overlayStyle === "split"
+                    ? `inset(0 ${overlayClipRightPct}% 0 0)`
+                    : undefined,
               }}
-              className="pointer-events-none object-fill rounded-xs transition-opacity duration-150"
+              className="pointer-events-none object-fill rounded-xs select-none"
             />
+          )}
+
+          {/* Draggable Vertical Split Line on Main Canvas when Split Wipe is active */}
+          {isSplitOverlayActive && (
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.95)] pointer-events-none"
+              style={{ left: `${ overlaySplitPercent }%` }}
+            >
+              <div className="absolute -top-3 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow">
+                {overlaySplitPercent}%
+              </div>
+              <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-indigo-600 border-2 border-white shadow-lg flex items-center justify-center text-white">
+                <GripVertical className="w-3.5 h-3.5" />
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -222,7 +305,11 @@ export const BeadCanvas: React.FC<BeadCanvasProps> = ({
               )}
             </div>
           ) : (
-            <span className="text-slate-500">Hover over display to inspect bead coordinates</span>
+            <span className="text-slate-500">
+              {isSplitOverlayActive
+                ? "Drag the vertical divider left/right to compare"
+                : "Hover over display to inspect bead coordinates"}
+            </span>
           )}
         </div>
       </div>

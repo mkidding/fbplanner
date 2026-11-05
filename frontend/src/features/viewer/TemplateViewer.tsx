@@ -47,7 +47,9 @@ export const TemplateViewer: React.FC<TemplateViewerProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [overlayMode, setOverlayMode] = useState<OverlaySourceMode>("none");
+  const [overlayStyle, setOverlayStyle] = useState<"split" | "opacity">("split");
   const [overlayOpacity, setOverlayOpacity] = useState<number>(45);
+  const [overlaySplitPercent, setOverlaySplitPercent] = useState<number>(50);
 
   const handleExportPng = () => {
     const canvas = canvasRef.current;
@@ -175,18 +177,39 @@ export const TemplateViewer: React.FC<TemplateViewerProps> = ({
             ))}
 
             {overlayMode !== "none" && (
-              <div className="flex items-center gap-2 pl-2">
-                <span className="text-[11px] text-slate-400 font-mono">
-                  Opacity {overlayOpacity}%
-                </span>
-                <input
-                  type="range"
-                  min={10}
-                  max={90}
-                  value={overlayOpacity}
-                  onChange={(e) => setOverlayOpacity(parseInt(e.target.value, 10))}
-                  className="w-20 accent-indigo-500 cursor-pointer"
-                />
+              <div className="flex items-center gap-2 pl-1 border-l border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setOverlayStyle("split")}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium cursor-pointer ${
+                    overlayStyle === "split"
+                      ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Draggable Split
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOverlayStyle("opacity")}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium cursor-pointer ${
+                    overlayStyle === "opacity"
+                      ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Opacity ({overlayOpacity}%)
+                </button>
+                {overlayStyle === "opacity" && (
+                  <input
+                    type="range"
+                    min={10}
+                    max={90}
+                    value={overlayOpacity}
+                    onChange={(e) => setOverlayOpacity(parseInt(e.target.value, 10))}
+                    className="w-16 accent-indigo-500 cursor-pointer"
+                  />
+                )}
               </div>
             )}
           </div>
@@ -221,7 +244,10 @@ export const TemplateViewer: React.FC<TemplateViewerProps> = ({
             displayZoom={displayZoom}
             highlightedColorId={highlightedColorId}
             overlayMode={overlayMode}
+            overlayStyle={overlayStyle}
             overlayOpacity={overlayOpacity}
+            overlaySplitPercent={overlaySplitPercent}
+            onChangeOverlaySplitPercent={setOverlaySplitPercent}
             rawPreviewUrl={rawPreviewUrl}
             extractedPreviewUrl={extractedPreviewUrl}
             canvasRef={canvasRef}
