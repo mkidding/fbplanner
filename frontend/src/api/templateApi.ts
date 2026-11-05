@@ -1,6 +1,8 @@
 import { TemplateConfigParams, TemplateGenerateResponse } from "../types/template";
 
-const API_BASE = "/api/v1";
+const API_BASE =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/+$/, "") ||
+  "/api/v1";
 
 export async function generateBeadTemplate(
   file: File,

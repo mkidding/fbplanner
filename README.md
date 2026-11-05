@@ -53,11 +53,12 @@ The repository is structured with strict **Frontend / Backend separation**:
 ```text
 fbplanner/
 ├── backend/                        # Python + FastAPI Image Processing Service
+│   ├── Dockerfile
 │   ├── pyproject.toml
 │   ├── requirements.txt
 │   ├── app/
 │   │   ├── main.py                 # FastAPI app factory & CORS setup
-│   │   ├── config.py               # Board constants (52x52) & palette settings
+│   │   ├── config.py               # Board constants (52x52), upload limits & CORS settings
 │   │   ├── api/
 │   │   │   ├── router.py           # /api/v1 router
 │   │   │   └── endpoints/
@@ -75,83 +76,201 @@ fbplanner/
 │   └── tests/
 │       └── test_api.py             # Pytest suite for palettes, contour modes & API
 │
-└── frontend/                       # React + TypeScript + Vite + Tailwind CSS Studio
-    ├── package.json
-    ├── vite.config.ts              # Proxies /api -> http://127.0.0.1:8000
-    └── src/
-        ├── App.tsx                 # 3-column studio layout
-        ├── api/
-        │   └── templateApi.ts      # Typed HTTP client
-        ├── types/
-        │   └── template.ts         # Shared TypeScript interfaces
-        ├── features/
-        │   ├── controls/           # ImageUploader, PaletteSelector, DimensionControls, ContourControls
-        │   ├── viewer/             # TemplateViewer, BeadCanvas & 4x4/8x8 ImageData sprite renderers
-        │   └── legend/             # ColorBomPanel (inventory counts & single-color peg highlighter)
-        └── utils/
-            └── sampleSpriteGenerator.ts
+├── frontend/                       # React + TypeScript + Vite + Tailwind CSS Studio
+│   ├── Dockerfile
+│   ├── nginx.conf                  # Production Nginx config & /api reverse proxy
+│   ├── package.json
+│   ├── vite.config.ts              # Dev server proxy (/api -> http://127.0.0.1:8000)
+│   └── src/
+│       ├── App.tsx                 # 3-column studio layout
+│       ├── api/
+│       │   └── templateApi.ts      # Typed HTTP client (supports VITE_API_BASE_URL)
+│       ├── types/
+│       │   └── template.ts         # Shared TypeScript interfaces
+│       ├── features/
+│       │   ├── controls/           # ImageUploader, PaletteSelector, DimensionControls, ContourControls
+│       │   ├── viewer/             # TemplateViewer, BeadCanvas & 4x4/8x8 ImageData sprite renderers
+│       │   └── legend/             # ColorBomPanel (inventory counts & single-color peg highlighter)
+│       └── utils/
+│           └── sampleSpriteGenerator.ts
+│
+└── docker-compose.yml              # One-command full-stack container orchestration
 ```
 
 ---
 
-## Getting Started
+## Guide 1: Running & Testing Locally (Desktop / Laptop)
 
-### Option A: One-Command Docker Compose
+Use this guide if you want to run, customize, or test the application directly on your local machine.
+
+### 1. Prerequisites
+- **Git**
+- **Python 3.11+** (with standard `venv`/`pip` or [`uv`](https://docs.astral.sh/uv/))
+- **Node.js 18+** (Node 20/22 LTS recommended) and `npm`
+
+### 2. Clone the Repository
 ```bash
-docker compose up --build
+git clone https://github.com/mkidding/fbplanner.git
+cd fbplanner
 ```
-Then open **http://localhost:8080** in your browser.
 
----
+### 3. Start the Backend Server (Terminal 1 — Port `8000`)
 
-### Option B: Local Development (Python + Node)
-
-#### Prerequisites
-- **Python 3.11+** (with `pip` or [`uv`](https://docs.astral.sh/uv/))
-- **Node.js 18+** and `npm`
-
-### 1. Start the Backend Server (FastAPI — Port `8000`)
-
+#### Using `venv` + `pip`:
 ```bash
 cd backend
-
-# Create and activate a virtual environment (using uv or standard venv)
 python3 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
+source .venv/bin/activate        # On Windows: .venv\Scripts\activate
+pip install --upgrade pip
 pip install -r requirements.txt
 
-# Start the FastAPI server with hot-reload
+# Launch FastAPI with live reload
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-*Interactive Swagger API docs will be available at `http://127.0.0.1:8000/docs`.*
-
-### 2. Start the Frontend Dev Server (Vite — Port `5173`)
-
-Open a second terminal:
-
+#### Or using `uv` (faster):
 ```bash
-cd frontend
-
-# Install npm packages
-npm install
-
-# Start Vite dev server
-npm run dev
+cd backend
+uv venv .venv --python 3.11
+uv pip install -r requirements.txt
+.venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Open **http://localhost:5173** in your browser. Vite automatically proxies `/api/*` requests to `http://127.0.0.1:8000`.
+> **Optional — High-Precision `rembg` ONNX Model:**
+> Out of the box, the backend uses a fast, zero-download OpenCV CIELAB + GrabCut foreground segmenter. If you want `rembg`'s neural U2-Net segmentation locally, place `u2netp.onnx` or `u2net.onnx` in `~/.u2net/` (or run `python -c "from rembg import new_session; new_session('u2netp')"` once inside `.venv`). The backend automatically detects and uses `~/.u2net/u2netp.onnx` when present.
 
-### 3. Run Tests & Production Build
+### 4. Start the Frontend Dev Server (Terminal 2 — Port `5173`)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+- Open **http://localhost:5173** in your browser.
+- Vite's dev server automatically proxies all `/api/*` requests to `http://127.0.0.1:8000`.
+- Interactive backend OpenAPI/Swagger documentation is available at **http://127.0.0.1:8000/docs**.
+
+### 5. Local Verification & Test Suite
+Run these commands to verify that both backend and frontend are healthy:
 
 ```bash
-# Run backend unit & integration tests
-cd backend && .venv/bin/pytest -v
+# 1. Run Backend Automated Pytest Suite (tests palettes, contour modes & endpoints)
+cd backend
+.venv/bin/pytest -v
 
-# Type-check and build frontend production bundle
-cd frontend && npm run build
+# 2. Verify Backend Health & Config Endpoints via curl
+curl -s http://127.0.0.1:8000/api/v1/health
+# Expected: {"status":"ok"}
+
+curl -s http://127.0.0.1:8000/api/v1/templates/config
+# Expected: {"board_width":52,"board_height":52,"default_palette_size":64,...}
+
+# 3. Run Frontend TypeScript Typecheck & Production Bundle Build
+cd ../frontend
+npm run build
+```
+
+---
+
+## Guide 2: Server & Cloud Deployment (Run & Test in the Cloud)
+
+You can deploy **FuseBead Studio** either as a **single unified stack via Docker Compose** (on any Linux VPS / EC2 / DigitalOcean Droplet / homelab server) or as **separate Frontend + Backend services** on managed cloud platforms (Render, Railway, Fly.io, Google Cloud Run, Vercel, Netlify).
+
+### Environment Variables Reference
+
+| Variable | Service | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `FB_CORS_ORIGINS` | Backend | `http://localhost:5173,http://localhost:8080,...` | Comma-separated list of allowed frontend origins (e.g. `https://beads.example.com`). |
+| `FB_MAX_UPLOAD_BYTES` | Backend | `10485760` (10 MB) | Maximum allowed raw image upload size in bytes. Returns HTTP `413` if exceeded. |
+| `VITE_API_BASE_URL` | Frontend (Build-time) | `/api/v1` | Override only when hosting the frontend on a different domain than the backend (e.g. `https://api.example.com/api/v1`). |
+
+---
+
+### Option A: Single-Server / Cloud VM Deployment (Docker Compose)
+
+This is the easiest way to host the entire app on an Ubuntu/Debian VPS, AWS EC2, DigitalOcean Droplet, or local server. Nginx serves the compiled React frontend on port `8080` and reverse-proxies `/api/*` directly to the FastAPI backend container over Docker's internal network.
+
+#### 1. Build and Start Containers
+```bash
+git clone https://github.com/mkidding/fbplanner.git
+cd fbplanner
+
+# Build and start in detached background mode
+docker compose up -d --build
+```
+
+#### 2. Check Container Status & Logs
+```bash
+docker compose ps
+docker compose logs -f
+```
+
+#### 3. Test the Deployed Server
+```bash
+# Verify health endpoint through the Nginx reverse proxy on port 8080
+curl -i http://localhost:8080/api/v1/health
+
+# Verify board & palette configuration
+curl -s http://localhost:8080/api/v1/templates/config
+```
+Then visit **`http://<YOUR_SERVER_IP>:8080`** in your browser.
+
+> **Production HTTPS Tip (Caddy / Nginx):**
+> To expose the app on a custom domain with automatic Let's Encrypt HTTPS, point a reverse proxy like [Caddy](https://caddyserver.com/) at `localhost:8080`:
+> ```caddyfile
+> beads.yourdomain.com {
+>     reverse_proxy localhost:8080
+> }
+> ```
+> And add `https://beads.yourdomain.com` to `FB_CORS_ORIGINS` in `docker-compose.yml`.
+
+---
+
+### Option B: Managed Cloud PaaS (Split Frontend & Backend)
+
+If you prefer serverless/managed PaaS hosting without managing a VM:
+
+#### Step 1: Deploy Backend (`backend/`) to Render / Railway / Fly.io / Cloud Run
+1. Point your cloud service to the **`backend/`** directory (using `backend/Dockerfile` or Python 3.11 buildpack).
+2. Set the start command (if not using the Dockerfile):
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port $PORT
+   ```
+3. Configure environment variables on the backend service:
+   - `FB_CORS_ORIGINS=https://your-frontend-domain.vercel.app`
+   - `FB_MAX_UPLOAD_BYTES=10485760`
+4. Verify your deployed backend URL:
+   ```bash
+   curl -s https://your-backend-service.onrender.com/api/v1/health
+   # Expected: {"status":"ok"}
+   ```
+
+#### Step 2: Deploy Frontend (`frontend/`) to Vercel / Netlify / Cloudflare Pages
+1. Set the Root Directory to **`frontend`**.
+2. Set Build Command: `npm run build` and Output Directory: `dist`.
+3. Add the build-time environment variable pointing to your backend from Step 1:
+   - `VITE_API_BASE_URL=https://your-backend-service.onrender.com/api/v1`
+4. Deploy and open your frontend URL — uploads and template generation will communicate directly with your cloud FastAPI backend.
+
+---
+
+### Post-Deployment End-to-End API Smoke Test
+
+Whether running locally or in the cloud, you can test the full image-to-bead pipeline from the command line using `curl` with any PNG/JPG file:
+
+```bash
+# Replace BASE_URL with http://127.0.0.1:8000 (local) or https://your-cloud-domain.com
+BASE_URL="http://127.0.0.1:8000"
+
+curl -X POST "${BASE_URL}/api/v1/templates/generate" \
+  -F "file=@./docs/screenshots/on-board-view.png" \
+  -F "target_width=36" \
+  -F "target_height=36" \
+  -F "palette_size=64" \
+  -F "extract_foreground=true" \
+  -F "preserve_aspect_ratio=true" \
+  -F "contour_mode=outer-contour" \
+  -F "contour_color=black" \
+  | python3 -m json.tool | head -n 30
 ```
 
 ---
