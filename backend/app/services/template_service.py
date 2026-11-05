@@ -26,8 +26,8 @@ from app.schemas.template import (
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 
-def _encode_rgba_thumbnail_data_url(rgba_img: Image.Image, max_side: int = 160) -> str:
-    """Encode an RGBA PIL Image as a compact base64 PNG data URL for UI preview."""
+def _encode_rgba_thumbnail_data_url(rgba_img: Image.Image, max_side: int = 480) -> str:
+    """Encode an RGBA PIL Image as a base64 PNG data URL for UI inspection and overlay."""
     thumb = rgba_img.copy()
     thumb.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
     buf = BytesIO()

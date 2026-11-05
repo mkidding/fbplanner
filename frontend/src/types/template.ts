@@ -8,6 +8,10 @@ export type ContourMode = "outer-contour" | "unify-edge" | "none";
 
 export type ContourColorPreset = "black" | "auto-dark" | "white";
 
+export type OverlaySourceMode = "none" | "bg-removed" | "raw";
+
+export type InspectModalTab = "side-by-side" | "split-curtain" | "raw" | "bg-removed";
+
 export interface Dimensions {
   width: number;
   height: number;

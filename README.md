@@ -28,6 +28,11 @@ In `Bot + Floating Hands`, the raw image has a detached floating orb above the h
 
 ![Retro Bot Template View](./docs/screenshots/robot-template-view.png)
 
+### 4. Interactive Pop-Up Inspection & Overlay Comparison Modal
+Click either the **Raw Input** or **BG Removed** thumbnail (or the **Compare / Overlay** button) to open the in-app comparison modal featuring a **3-Stage Pipeline View**, an interactive **Split-Curtain Wipe**, and an **Alpha Overlay Blend**—or toggle the live peg-aligned **Reference Overlay** directly on the main 52×52 board:
+
+![3-Stage Pipeline Comparison Modal](./docs/screenshots/compare-modal-view.png)
+
 ---
 
 ## Key Features

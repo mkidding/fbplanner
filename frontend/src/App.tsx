@@ -7,12 +7,14 @@ import { ForegroundToggle } from "./features/controls/ForegroundToggle";
 import { ImageUploader } from "./features/controls/ImageUploader";
 import { PaletteSelector } from "./features/controls/PaletteSelector";
 import { ColorBomPanel } from "./features/legend/ColorBomPanel";
+import { ImageCompareModal } from "./features/viewer/ImageCompareModal";
 import { TemplateViewer } from "./features/viewer/TemplateViewer";
 import {
   CellPixelScale,
   ContourColorPreset,
   ContourMode,
   DisplayViewMode,
+  InspectModalTab,
   PaletteSize,
   TemplateGenerateResponse,
 } from "./types/template";
@@ -37,10 +39,19 @@ export const App: React.FC = () => {
   const [displayZoom, setDisplayZoom] = useState<number>(1);
   const [highlightedColorId, setHighlightedColorId] = useState<number | null>(null);
 
+  // Inspection & Comparison Modal state
+  const [inspectModalOpen, setInspectModalOpen] = useState<boolean>(false);
+  const [inspectModalTab, setInspectModalTab] = useState<InspectModalTab>("side-by-side");
+
   // API output state
   const [template, setTemplate] = useState<TemplateGenerateResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleOpenInspectModal = useCallback((tab: InspectModalTab) => {
+    setInspectModalTab(tab);
+    setInspectModalOpen(true);
+  }, []);
 
   // Manage object URL for raw image preview
   const handleSelectFile = useCallback((file: File) => {
@@ -149,6 +160,7 @@ export const App: React.FC = () => {
             extractedPreviewUrl={template?.extracted_preview_data_url}
             extractForeground={extractForeground}
             onSelectFile={handleSelectFile}
+            onOpenInspectModal={handleOpenInspectModal}
           />
 
           <hr className="border-slate-800" />
@@ -217,6 +229,9 @@ export const App: React.FC = () => {
             displayZoom={displayZoom}
             onDisplayZoomChange={setDisplayZoom}
             highlightedColorId={highlightedColorId}
+            rawPreviewUrl={previewUrl}
+            extractedPreviewUrl={template?.extracted_preview_data_url ?? null}
+            onOpenInspectModal={handleOpenInspectModal}
           />
         </section>
 
@@ -229,6 +244,16 @@ export const App: React.FC = () => {
           />
         </section>
       </main>
+
+      {/* Pop-Up Modal for Inspecting Raw / BG Removed / 3-Stage Pipeline & Split Curtain Overlay */}
+      <ImageCompareModal
+        isOpen={inspectModalOpen}
+        initialTab={inspectModalTab}
+        rawPreviewUrl={previewUrl}
+        extractedPreviewUrl={template?.extracted_preview_data_url ?? null}
+        template={template}
+        onClose={() => setInspectModalOpen(false)}
+      />
     </div>
   );
 };

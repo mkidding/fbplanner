@@ -1,8 +1,17 @@
-import React, { useRef } from "react";
-import { Download, Grid, Image as ImageIcon, Maximize2 } from "lucide-react";
+import React, { useRef, useState } from "react";
+import {
+  Columns,
+  Download,
+  Grid,
+  Image as ImageIcon,
+  Layers,
+  Maximize2,
+} from "lucide-react";
 import {
   CellPixelScale,
   DisplayViewMode,
+  InspectModalTab,
+  OverlaySourceMode,
   TemplateGenerateResponse,
 } from "../../types/template";
 import { BeadCanvas } from "./BeadCanvas";
@@ -17,6 +26,9 @@ interface TemplateViewerProps {
   displayZoom: number;
   onDisplayZoomChange: (zoom: number) => void;
   highlightedColorId: number | null;
+  rawPreviewUrl: string | null;
+  extractedPreviewUrl: string | null;
+  onOpenInspectModal: (tab: InspectModalTab) => void;
 }
 
 export const TemplateViewer: React.FC<TemplateViewerProps> = ({
@@ -29,8 +41,13 @@ export const TemplateViewer: React.FC<TemplateViewerProps> = ({
   displayZoom,
   onDisplayZoomChange,
   highlightedColorId,
+  rawPreviewUrl,
+  extractedPreviewUrl,
+  onOpenInspectModal,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [overlayMode, setOverlayMode] = useState<OverlaySourceMode>("none");
+  const [overlayOpacity, setOverlayOpacity] = useState<number>(45);
 
   const handleExportPng = () => {
     const canvas = canvasRef.current;
@@ -44,14 +61,14 @@ export const TemplateViewer: React.FC<TemplateViewerProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
-      {/* Top Toolbar: View Toggle ("On-Board" vs "Just Image") + Pixel Cell Mapping */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-900/90 border-b border-slate-800">
+      {/* Row 1 Toolbar: View Toggle ("On-Board" vs "Just Image") + Pixel Scale & Zoom */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-900/90 border-b border-slate-800">
         {/* Primary Display Mode Toggle */}
         <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
           <button
             type="button"
             onClick={() => onViewModeChange("on-board")}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               viewMode === "on-board"
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-slate-400 hover:text-slate-200"
@@ -63,7 +80,7 @@ export const TemplateViewer: React.FC<TemplateViewerProps> = ({
           <button
             type="button"
             onClick={() => onViewModeChange("just-image")}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               viewMode === "just-image"
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-slate-400 hover:text-slate-200"
@@ -75,7 +92,7 @@ export const TemplateViewer: React.FC<TemplateViewerProps> = ({
         </div>
 
         {/* Sub-pixel Bead Block Size & Zoom Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           {/* 4x4 vs 8x8 Display Pixels per Bead */}
           <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800">
             <span className="text-[11px] text-slate-400 font-medium">Bead Sprite:</span>
@@ -128,6 +145,63 @@ export const TemplateViewer: React.FC<TemplateViewerProps> = ({
         </div>
       </div>
 
+      {/* Row 2 Toolbar: Live Reference Overlay on Canvas & Pop-up Comparison Trigger */}
+      {template && (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-slate-950/60 border-b border-slate-800/80 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-1.5 text-slate-400 font-medium">
+              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+              Overlay Reference:
+            </span>
+            {(
+              [
+                { id: "none", label: "Off" },
+                { id: "bg-removed", label: "BG Removed" },
+                { id: "raw", label: "Raw Input" },
+              ] as { id: OverlaySourceMode; label: string }[]
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setOverlayMode(opt.id)}
+                className={`px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                  overlayMode === opt.id
+                    ? "bg-indigo-600 text-white"
+                    : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+
+            {overlayMode !== "none" && (
+              <div className="flex items-center gap-2 pl-2">
+                <span className="text-[11px] text-slate-400 font-mono">
+                  Opacity {overlayOpacity}%
+                </span>
+                <input
+                  type="range"
+                  min={10}
+                  max={90}
+                  value={overlayOpacity}
+                  onChange={(e) => setOverlayOpacity(parseInt(e.target.value, 10))}
+                  className="w-20 accent-indigo-500 cursor-pointer"
+                />
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onOpenInspectModal("split-curtain")}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold transition-colors cursor-pointer"
+          >
+            <Columns className="w-3.5 h-3.5" />
+            Pop-Up Split & Side-by-Side Compare
+          </button>
+        </div>
+      )}
+
       {/* Main Viewport Body */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-auto min-h-[480px] relative">
         {isLoading && (
@@ -146,6 +220,10 @@ export const TemplateViewer: React.FC<TemplateViewerProps> = ({
             cellScale={cellScale}
             displayZoom={displayZoom}
             highlightedColorId={highlightedColorId}
+            overlayMode={overlayMode}
+            overlayOpacity={overlayOpacity}
+            rawPreviewUrl={rawPreviewUrl}
+            extractedPreviewUrl={extractedPreviewUrl}
             canvasRef={canvasRef}
           />
         ) : (

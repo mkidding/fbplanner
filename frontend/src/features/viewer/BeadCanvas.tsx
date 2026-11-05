@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   CellPixelScale,
   DisplayViewMode,
+  OverlaySourceMode,
   PaletteColorUsage,
   TemplateGenerateResponse,
 } from "../../types/template";
@@ -14,6 +15,10 @@ interface BeadCanvasProps {
   cellScale: CellPixelScale;
   displayZoom: number;
   highlightedColorId: number | null;
+  overlayMode: OverlaySourceMode;
+  overlayOpacity: number;
+  rawPreviewUrl: string | null;
+  extractedPreviewUrl: string | null;
   canvasRef?: React.RefObject<HTMLCanvasElement>;
 }
 
@@ -29,6 +34,10 @@ export const BeadCanvas: React.FC<BeadCanvasProps> = ({
   cellScale,
   displayZoom,
   highlightedColorId,
+  overlayMode,
+  overlayOpacity,
+  rawPreviewUrl,
+  extractedPreviewUrl,
   canvasRef: externalRef,
 }) => {
   const internalRef = useRef<HTMLCanvasElement>(null);
@@ -63,6 +72,29 @@ export const BeadCanvas: React.FC<BeadCanvasProps> = ({
 
   const nativePixelWidth = gridCols * cellScale;
   const nativePixelHeight = gridRows * cellScale;
+  const renderedWidth = nativePixelWidth * displayZoom;
+  const renderedHeight = nativePixelHeight * displayZoom;
+
+  // Compute exact overlay box coordinates in screen pixels so the reference image aligns peg-for-peg
+  const hasContourMargin =
+    template.contour_mode === "outer-contour" &&
+    template.image_size.width >= 5 &&
+    template.image_size.height >= 5;
+  const marginBeads = hasContourMargin ? 1 : 0;
+
+  const overlayStartCol =
+    (viewMode === "on-board" ? template.board_offset.x : 0) + marginBeads;
+  const overlayStartRow =
+    (viewMode === "on-board" ? template.board_offset.y : 0) + marginBeads;
+  const overlayBeadCols = Math.max(1, template.image_size.width - marginBeads * 2);
+  const overlayBeadRows = Math.max(1, template.image_size.height - marginBeads * 2);
+
+  const overlayUrl =
+    overlayMode === "bg-removed"
+      ? extractedPreviewUrl
+      : overlayMode === "raw"
+      ? rawPreviewUrl
+      : null;
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = activeCanvasRef.current;
@@ -113,17 +145,42 @@ export const BeadCanvas: React.FC<BeadCanvasProps> = ({
             : "bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:12px_12px] bg-slate-900/70 border-indigo-500/30 shadow-2xl"
         }`}
       >
-        <canvas
-          ref={activeCanvasRef}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => setHoverInfo(null)}
+        <div
+          className="relative"
           style={{
-            width: `${nativePixelWidth * displayZoom}px`,
-            height: `${nativePixelHeight * displayZoom}px`,
-            imageRendering: "pixelated",
+            width: `${renderedWidth}px`,
+            height: `${renderedHeight}px`,
           }}
-          className="block cursor-crosshair rounded-sm"
-        />
+        >
+          <canvas
+            ref={activeCanvasRef}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => setHoverInfo(null)}
+            style={{
+              width: `${renderedWidth}px`,
+              height: `${renderedHeight}px`,
+              imageRendering: "pixelated",
+            }}
+            className="block cursor-crosshair rounded-sm"
+          />
+
+          {/* Live Reference Image Overlay aligned peg-for-peg with the generated figure */}
+          {overlayUrl && overlayMode !== "none" && (
+            <img
+              src={overlayUrl}
+              alt="Reference overlay"
+              style={{
+                position: "absolute",
+                left: `${overlayStartCol * cellScale * displayZoom}px`,
+                top: `${overlayStartRow * cellScale * displayZoom}px`,
+                width: `${overlayBeadCols * cellScale * displayZoom}px`,
+                height: `${overlayBeadRows * cellScale * displayZoom}px`,
+                opacity: overlayOpacity / 100,
+              }}
+              className="pointer-events-none object-fill rounded-xs transition-opacity duration-150"
+            />
+          )}
+        </div>
       </div>
 
       {/* Bottom status / hover bar */}
